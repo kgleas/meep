@@ -7,8 +7,6 @@ import threading
 import time
 
 def handle_connection(sock):
-    index = 0;
-    endset = "\r\n\r\n"
     data = ''
     while 1:
         try:

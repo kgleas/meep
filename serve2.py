@@ -1,41 +1,37 @@
 #! /usr/bin/env python
 import sys
 import socket
-from meep_example_app import MeepExampleApp, initialize
+import miniapp
 import datetime
 initialize()
 app = MeepExampleApp()
 app.override_authentication = True
 
 def handle_connection(sock):
+    index = 0;
+    data = ''
     while 1:
         try:
-            data = sock.recv(4096)
+            d = sock.recv(1)
+            data += d;
+            if data[-4:] == "\r\n\r\n":
+                break
             if not data:
                 break
 
-            print 'Data:', (data,)
-
-            def fake_start_response(status, headers):
-                print status
-                print headers
-                print datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-                print '\n'
-    
-            environ = {}
-            environ['PATH_INFO'] = data.lstrip('GET').strip()
-            for x in app.__call__(environ, fake_start_response):
-                sock.sendall(x)
-
-            if '.\r\n' in data:
-                sock.close()
-                break
         except socket.error:
-            break
+            return
+
+    data = miniapp.format_return(data)
+
+    data = str(data)
+
+    sock.sendall(data)
+    sock.close()
 
 if __name__ == '__main__':
-    interface, port = sys.argv[1:3]
-    port = int(port)
+    port = 8000
+    interface = 'localhost'
     
 
     print 'Binding', interface, port

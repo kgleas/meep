@@ -26,6 +26,8 @@ Functions and classes:
 __all__ = ['Message', 'get_all_messages', 'get_message', 'delete_message',
            'User', 'get_user', 'get_all_users', 'delete_user']
 import pickle
+import sqlite3 as lite
+import sys
 ###
 # internal data structures & functions; please don't access these
 # directly from outside the module.  Note, I'm not responsible for
@@ -104,13 +106,13 @@ def delete_message(msg):
     
 def add_reply(message_id, reply):
     if _replies.has_key(message_id):
-        _replies[message_id].append(reply)        
+        _replies[message_id].append(reply)
+        print _replies[message_id]
     else:
         _replies[message_id] = [reply]
 
 def get_replies(message_id):
     if _replies.has_key(message_id):
-        print _replies
         return _replies[message_id]
     else:
         return -1
@@ -215,23 +217,34 @@ def save_reply():
     fp.close()
     
 def load():
-    filename = 'posts.pickle'
-    fp = open(filename)
-    obj = pickle.load(fp)
-    for i in obj:
-        if i[0]=="Message":
-            Message(i[1], i[2], i[3])
-    fp2=open("replies.pickle")
-    obj=pickle.load(fp2)
-    print "REPLY OBJ", obj
-    h=0
-    for reply in obj:
-        print "REPLY", reply
-        i=0
-        for msg in reply[1]:
-            add_reply(reply[0],reply[1][i])
-            i+=1
-        h+=1
+    con = lite.connect('meepdb.db')
+    cur = con.cursor()
+    try:
+        with con:
+            con.row_factory = lite.Row
+            cur = con.cursor()
+            cur.execute("SELECT * FROM messages")
+            rows = cur.fetchall()
+            for row in rows:
+                Message(row["title"], row["post"],get_user(row["author"]))
+            cur.execute("SELECT * FROM replies")
+            rows = cur.fetchall()
+            for row in rows:
+                add_reply(row["parent"], row["reply"])
+            replies = get_replies(2)
+
+            if (replies!=-1):
+                for r in replies:
+                    print r
+    except lite.Error, e:
+
+       print "Error %s:" % e.args[0]
+       sys.exit(1)
+
+    finally:
+
+       if con:
+          con.close()
 class User(object):
     def __init__(self, username, password):
         self.username = username

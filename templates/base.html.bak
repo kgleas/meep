@@ -19,6 +19,9 @@
 <div id="top">
 <h2><a href="http://localhost:8000" title="Back to main page">Meep</a></h2>
 <div id="menu">
+<ul>
+<li><a href="#" class="current">home</a></li>
+</ul>
 </div>
 </div>
 <div id="content">

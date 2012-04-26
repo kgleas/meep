@@ -2,8 +2,14 @@ import meeplib
 import traceback
 import cgi
 import meepcookie
-
+from file_server import FileServer
 from jinja2 import Environment, FileSystemLoader
+import os
+import sqlite3 as lite
+
+con = lite.connect('meepdb.db')
+cur = con.cursor()
+
 def initialize():
     # create a default user
     u = meeplib.User('test', 'foo')
@@ -94,9 +100,11 @@ class MeepExampleApp(object):
     
     def list_messages(self, environ, start_response):
         messages = meeplib.get_all_messages()
+        replies = meeplib.get_replies(2)
+        print replies
         headers = [('Content-type', 'text/html')]
         start_response("200 OK", headers)
-        return [ render_page('list_messages.html', messages=messages) ]
+        return [ render_page('list_messages.html', messages=messages,replies=replies) ]
 
 
     def search_message_action(self, environ, start_response):
@@ -133,8 +141,12 @@ class MeepExampleApp(object):
         username = 'test'
         user = meeplib.get_user(username)
         
-        new_message = meeplib.Message(title, message, user)
-        meeplib.save_message()
+
+        with con:
+            cur.execute("INSERT INTO messages (title, post, author) VALUES (?, ?, ?)", (title, message, username,))
+
+        con.commit()
+        meeplib.load()
         headers = [('Content-type', 'text/html')]
         headers.append(('Location', '/m/list'))
         start_response("302 Found", headers)
@@ -144,8 +156,12 @@ class MeepExampleApp(object):
         qString = cgi.parse_qs(environ['QUERY_STRING'])
         mId = qString.get('id', [''])[0]
         messageID = meeplib.get_message(int(mId))
+        mId= int(mId)
         meeplib.delete_message(messageID)
-   
+        with con:
+            cur.execute("DELETE FROM messages WHERE id = (?)", (mId))
+
+        con.commit()
      
         headers = [('Content-type', 'text/html')]
         headers.append(('Location', '/m/list'))
@@ -159,7 +175,7 @@ class MeepExampleApp(object):
 		qString = cgi.parse_qs(environ['QUERY_STRING'])
 		mId = qString.get('id', [''])[0]
 		headers = [('Content-type', 'text/html')]
-
+                mId=int(mId);
 		start_response("200 OK", headers)
 		return [ render_page('add_reply.html', mId=mId) ]
 
@@ -169,9 +185,11 @@ class MeepExampleApp(object):
         form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
         message = form['message'].value
         mId = int(form['id'].value)
-        
-        meeplib.add_reply(mId, message)
-        meeplib.save_reply()
+        with con:
+            cur.execute("INSERT INTO replies (parent, reply) VALUES (?, ?)", (mId, message))
+
+        con.commit()
+
         headers = [('Content-type', 'text/html')]
         headers.append(('Location', '/m/list'))
         start_response("302 Found", headers)
@@ -190,7 +208,14 @@ class MeepExampleApp(object):
                       '/m/add_reply': self.add_reply,
                       '/m/add_reply_action':self.add_reply_action,
                       '/m/search_action': self.search_message_action,
-                      '/m/search': self.list_search
+                      '/m/search': self.list_search,
+							 '/css/style.css': FileServer("css/style.css"),
+							 '/img/bg_menu.gif': FileServer("img/bg_menu.gif"),
+							 '/img/bg_t.gif': FileServer("img/bg_t.gif"),
+							 '/img/bullet.gif': FileServer("img/bullet.gif"),
+							 '/img/logo.gif': FileServer("img/logo.gif"),
+							 '/img/logo_.gif': FileServer("img/logo_.gif"),
+							 '/img/top_bg.gif': FileServer("img/top_gb_.gif")
                       }
 
         # see if the URL is in 'call_dict'; if it is, call that function.

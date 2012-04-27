@@ -6,10 +6,26 @@ from file_server import FileServer
 from jinja2 import Environment, FileSystemLoader
 import os
 import sqlite3 as lite
+import uuid
 
 con = lite.connect('meepdb.db')
 cur = con.cursor()
 
+
+def session_get(c, session_cookie):
+        username = None
+        session_cookie=str(session_cookie)
+        cur.execute('SELECT username FROM sessions WHERE cookie=?', [session_cookie])
+        con.commit()
+
+        try:
+            username = cur.fetchone()[0]
+        except:
+            pass
+        return username
+    
+
+        
 def initialize():
     # create a default user
     u = meeplib.User('test', 'foo')
@@ -31,7 +47,7 @@ class MeepExampleApp(object):
     """
     def index(self, environ, start_response):
         start_response("200 OK", [('Content-type', 'text/html')])
-        username="test"
+
 
         
         cookie = environ.get("HTTP_COOKIE")
@@ -39,13 +55,25 @@ class MeepExampleApp(object):
 				welcome = "You are not logged in"
 				return [ render_page('index.html', username="",welcome=welcome) ]
         else:
+                                scookie = cookie[9:]
+                                username=session_get(cur,scookie)
 				welcome = "you are logged in as user:"
 				return [ render_page('index.html', username=username,welcome=welcome) ]
         
 
     def login(self, environ, start_response):
+        username = 'sessionuser'
+        session_cookie = str(uuid.uuid4())
+        username=str(username)
+        cur.execute('INSERT INTO sessions (username, cookie) VALUES (?, ?)', (username, session_cookie))
+        con.commit()
+        print "THE COOKIE",session_cookie
+        usernameDB=session_get(cur,session_cookie)
+        print "THE USERNAMEDB ",usernameDB
+
+
+
         # hard code the username for now; this should come from Web input!
-        username = 'test'
 
         # retrieve user
         user = meeplib.get_user(username)
@@ -53,7 +81,7 @@ class MeepExampleApp(object):
         # set content-type
         headers = [('Content-type', 'text/html')]
         #cookies
-        cookie_name, cookie_val = meepcookie.make_set_cookie_header('username',user.username)
+        cookie_name, cookie_val = meepcookie.make_set_cookie_header('username',session_cookie)
 
         headers.append((cookie_name, cookie_val))
         # send back a redirect to '/'
@@ -65,9 +93,17 @@ class MeepExampleApp(object):
         return "no such content"
 
     def logout(self, environ, start_response):
+
+
         # does nothing
         headers = [('Content-type', 'text/html')]
         cookie_name, cookie_val = meepcookie.make_set_cookie_header('username','')
+
+        cookie = environ.get("HTTP_COOKIE")
+        cookie = cookie[9:]
+        session_cookie=str(cookie)
+        cur.execute('DELETE from sessions WHERE cookie=?', [session_cookie])
+        con.commit()
 
         headers.append((cookie_name, cookie_val))
         # send back a redirect to '/'
